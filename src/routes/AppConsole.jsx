@@ -249,9 +249,13 @@ const [onboardingStatus, setOnboardingStatus] = useState("");
 const [onboardingForm, setOnboardingForm] = useState(() => sanitizeOnboardingForm(user));
   const [health, setHealth] = useState("checking");
   const [isMobile, setIsMobile] = useState(typeof window !== "undefined" ? window.innerWidth <= 820 : false);
+  const [mobileThreadsOpen, setMobileThreadsOpen] = useState(false);
 
   useEffect(() => {
-    if (!isMobile) setAgentSelectorOpen(false);
+    if (!isMobile) {
+      setAgentSelectorOpen(false);
+      setMobileThreadsOpen(false);
+    }
   }, [isMobile]);
 
   const [threads, setThreads] = useState([]);
@@ -2448,6 +2452,7 @@ async function stopRealtime(reason = 'client_stop') {
   };
 
   const meName = user?.name || user?.email || "Você";
+  const currentThread = threads.find((t) => t.id === threadId) || null;
 
   if (!onboardingChecked) {
     return <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#0f1115", color: "#fff", fontFamily: "system-ui" }}>Carregando sua experiência...</div>;
@@ -2615,7 +2620,7 @@ async function stopRealtime(reason = 'client_stop') {
       <div style={styles.main}>
         <div style={{ ...styles.topbar, padding: isMobile ? "12px 14px" : styles.topbar.padding, gap: 12 }}>
           <div style={{ minWidth: 0 }}>
-            <div style={styles.title}>{threads.find((t) => t.id === threadId)?.title || "Conversa"}</div>
+            <div style={styles.title}>{currentThread?.title || "Conversa"}</div>
             <div style={{ ...styles.health, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
               <span>Destino: {destMode === "team" ? "Team" : destMode === "single" ? "Agente" : "Multi"}</span>
               {realtimeMode ? (
@@ -2668,7 +2673,41 @@ async function stopRealtime(reason = 'client_stop') {
               ) : null}
             </div>
           ) : (
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                style={{ ...styles.btn, padding: "8px 12px", borderRadius: 14 }}
+                onClick={() => setMobileThreadsOpen(true)}
+                title="Conversas"
+              >
+                Conversas
+              </button>
+              <button
+                type="button"
+                style={{ ...styles.btn, padding: "8px 12px", borderRadius: 14 }}
+                onClick={createThread}
+                title="Nova conversa"
+              >
+                Novo
+              </button>
+              <button
+                type="button"
+                style={{ ...styles.btn, padding: "8px 12px", borderRadius: 14, opacity: threadId ? 1 : 0.6 }}
+                onClick={() => threadId && renameThread(threadId)}
+                title="Renomear conversa"
+                disabled={!threadId}
+              >
+                Renomear
+              </button>
+              <button
+                type="button"
+                style={{ ...styles.btn, padding: "8px 12px", borderRadius: 14, opacity: rtcSessionIdRef.current ? 1 : 0.6 }}
+                onClick={downloadRealtimeAta}
+                title="Baixar ata da sessão"
+                disabled={!rtcSessionIdRef.current}
+              >
+                Ata
+              </button>
               <button
                 type="button"
                 style={{ ...styles.btn, ...styles.btnPrimary, padding: "8px 12px", borderRadius: 14 }}
@@ -3022,6 +3061,122 @@ async function stopRealtime(reason = 'client_stop') {
           ) : null}
         </div>
       </div>
+
+
+      {mobileThreadsOpen ? (
+        <div style={styles.modalBack} onClick={() => setMobileThreadsOpen(false)}>
+          <div
+            style={{
+              ...styles.modal,
+              width: "min(100%, 560px)",
+              maxHeight: "82vh",
+              marginTop: "auto",
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ ...styles.topRow, alignItems: "flex-start" }}>
+              <div>
+                <div style={styles.modalTitle}>Conversas</div>
+                <div style={styles.hint}>Inicie, troque, renomeie ou exclua conversas sem sair do mobile.</div>
+              </div>
+              <button
+                type="button"
+                style={{ ...styles.iconBtn, width: 32, height: 32 }}
+                onClick={() => setMobileThreadsOpen(false)}
+                title="Fechar"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, marginTop: 14, marginBottom: 14, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                style={{ ...styles.btn, ...styles.btnPrimary }}
+                onClick={async () => {
+                  await createThread();
+                  setMobileThreadsOpen(false);
+                }}
+              >
+                <IconPlus /> Nova conversa
+              </button>
+              <button
+                type="button"
+                style={{ ...styles.btn, opacity: threadId ? 1 : 0.6 }}
+                onClick={() => threadId && renameThread(threadId)}
+                disabled={!threadId}
+              >
+                <IconEdit /> Renomear atual
+              </button>
+            </div>
+
+            <div style={{ display: "grid", gap: 8 }}>
+              {threads.length === 0 ? (
+                <div style={styles.emptyThreads}>Nenhuma conversa ainda.</div>
+              ) : (
+                threads.map((t) => (
+                  <div
+                    key={t.id}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr auto",
+                      gap: 8,
+                      alignItems: "center",
+                      padding: "10px 12px",
+                      borderRadius: 14,
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      background: t.id === threadId ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.03)",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setThreadId(t.id);
+                        setMobileThreadsOpen(false);
+                      }}
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        color: "#fff",
+                        textAlign: "left",
+                        padding: 0,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 4,
+                      }}
+                    >
+                      <span style={{ fontWeight: 700, fontSize: 14 }}>{t.title || "Nova conversa"}</span>
+                      <span style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>
+                        {t.id === threadId ? "Conversa ativa" : "Toque para abrir"}
+                      </span>
+                    </button>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button
+                        type="button"
+                        style={styles.threadEditBtn}
+                        onClick={() => renameThread(t.id)}
+                        title="Renomear conversa"
+                      >
+                        <IconEdit />
+                      </button>
+                      <button
+                        type="button"
+                        style={styles.threadEditBtn}
+                        onClick={() => deleteThread(t.id)}
+                        title="Deletar conversa"
+                      >
+                        <IconTrash />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
 
       {agentSelectorOpen ? (
