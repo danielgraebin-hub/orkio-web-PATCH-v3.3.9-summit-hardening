@@ -1405,6 +1405,7 @@ function scheduleRealtimeIdleFollowup() {
       if (!payload?.blocked) return false;
       setRtcReadyToRespond(false);
       rtcLastFinalTranscriptRef.current = "";
+      queueRealtimeEvent({ event_type: "response.final", role: "assistant", content: payload.reply || "", is_final: true, meta: { source: "server_guard" } });
       commitRealtimeAssistantFinal(payload.reply || "", { source: "server_guard" });
       return true;
     } catch (err) {
@@ -1809,12 +1810,11 @@ function scheduleRealtimeIdleFollowup() {
     rtcLastAssistantFinalRef.current = dedupeKey;
     rtcAssistantFinalCommittedRef.current = true;
 
-    // Realtime transcript must stay out of the visible chat.
-    // It is persisted only in realtime_events and exported later in the ATA/report.
-    queueRealtimeEvent({ event_type: 'response.final', role: 'assistant', content: finalText, is_final: true, meta: { source, visible_in_chat: false } });
+    queueRealtimeEvent({ event_type: 'response.final', role: 'assistant', content: finalText, is_final: true, meta: { source } });
+    try {} catch {}
 
-    setUploadStatus('📝 Resposta registrada na ata da sessão.');
-    setTimeout(() => setUploadStatus(''), 1800);
+    setUploadStatus('📝 ' + finalText.slice(0, 80) + (finalText.length > 80 ? '…' : ''));
+    setTimeout(() => setUploadStatus(''), 2500);
     setTimeout(() => { try { scheduleRealtimeIdleFollowup(); } catch {} }, REALTIME_REARM_AFTER_ASSISTANT_MS);
   }
 
@@ -2893,20 +2893,20 @@ async function stopRealtime(reason = 'client_stop') {
             <div style={{ fontSize: 12, color: "rgba(255,255,255,0.62)" }}>
               AI-generated responses may contain inaccuracies. Always verify important information before relying on them.
             </div>
-            <div style={{ display: isMobile ? "none" : "flex", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, width: isMobile ? "100%" : "auto", justifyContent: isMobile ? "flex-end" : "initial" }}>
               <button
                 onClick={downloadRealtimeAta}
                 style={{ ...styles.btn, padding: "6px 10px", fontSize: "12px", opacity: rtcSessionIdRef.current ? 1 : 0.6 }}
-                title="Baixar relatório executivo da sessão"
+                title="Baixar ata da sessão"
                 disabled={!rtcSessionIdRef.current}
               >
-                ⬇️ Relatório
+                ⬇️ Ata
               </button>
             </div>
           </div>
 
           {/* Voice Mode controls — PATCH0100_14 enhanced */}
-          {voiceMode && SUMMIT_VOICE_MODE === "stt_tts" && !isMobile && (
+          {voiceMode && SUMMIT_VOICE_MODE === "stt_tts" && (
             <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "4px 8px", fontSize: "12px", color: "rgba(255,255,255,0.7)", flexWrap: "wrap" }}>
               {lastAgentInfo?.avatar_url && (
                 <img src={lastAgentInfo.avatar_url} alt="" style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover" }} onError={(e) => { e.target.style.display = 'none'; }} />
@@ -2938,9 +2938,9 @@ async function stopRealtime(reason = 'client_stop') {
                 <button
                   onClick={downloadRealtimeAta}
                   style={{ ...styles.btn, padding: "4px 8px", fontSize: "11px" }}
-                  title="Baixar relatório executivo da sessão"
+                  title="Baixar ata da sessão"
                 >
-                  ⬇️ Relatório
+                  ⬇️ Ata
                 </button>
               )}
             </div>
