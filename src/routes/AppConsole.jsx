@@ -620,15 +620,36 @@ async function submitOnboarding() {
   setOnboardingBusy(true);
   setOnboardingStatus("Salvando seu onboarding...");
   try {
-    const { data } = await apiFetch("/api/user/onboarding", {
-      method: "POST",
-      token,
-      org: tenant,
-      body: {
-        ...payload,
-        onboarding_completed: true,
-      },
-    });
+    const onboardingBody = {
+      ...payload,
+      onboarding_completed: true,
+    };
+
+    let data = null;
+    try {
+      const resp = await apiFetch("/api/user/onboarding", {
+        method: "POST",
+        token,
+        org: tenant,
+        body: onboardingBody,
+      });
+      data = resp?.data || null;
+    } catch (postErr) {
+      const detail = String(postErr?.detail || postErr?.message || "");
+      const shouldRetryPut =
+        postErr?.status === 405 ||
+        /method not allowed/i.test(detail) ||
+        /not allowed/i.test(detail);
+      if (!shouldRetryPut) throw postErr;
+
+      const resp = await apiFetch("/api/user/onboarding", {
+        method: "PUT",
+        token,
+        org: tenant,
+        body: onboardingBody,
+      });
+      data = resp?.data || null;
+    }
 
     const nextUser = data?.user || { ...(user || {}), ...payload, profile_role: payload.role, onboarding_completed: true };
     setUser(nextUser);
@@ -2378,13 +2399,30 @@ async function stopRealtime(reason = 'client_stop') {
       justifyContent: "center",
       opacity: sending ? 0.6 : 1,
     },
+    input: {
+      width: "100%",
+      padding: "12px 14px",
+      borderRadius: "14px",
+      border: "1px solid rgba(255,255,255,0.14)",
+      background: "rgba(9,10,18,0.96)",
+      color: "#f6f7fb",
+      fontSize: "14px",
+      lineHeight: 1.4,
+      outline: "none",
+      boxSizing: "border-box",
+      boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+    },
     select: {
-      padding: "8px 10px",
-      borderRadius: "12px",
-      border: "1px solid rgba(255,255,255,0.12)",
-      background: "rgba(255,255,255,0.05)",
-      color: "#fff",
-      fontSize: "12px",
+      width: "100%",
+      padding: "12px 14px",
+      borderRadius: "14px",
+      border: "1px solid rgba(255,255,255,0.14)",
+      background: "rgba(9,10,18,0.96)",
+      color: "#f6f7fb",
+      fontSize: "14px",
+      lineHeight: 1.4,
+      outline: "none",
+      boxSizing: "border-box",
     },
     modalBack: {
       position: "fixed",
@@ -2401,13 +2439,18 @@ async function stopRealtime(reason = 'client_stop') {
       paddingBottom: "max(16px, env(safe-area-inset-bottom))",
     },
     modal: {
-      width: "min(720px, 96vw)",
-      borderRadius: "18px",
-      border: "1px solid rgba(255,255,255,0.12)",
-      background: "rgba(12,12,20,0.96)",
-      padding: "16px",
+      width: "min(760px, 96vw)",
+      maxHeight: "min(88dvh, 860px)",
+      overflowY: "auto",
+      borderRadius: "22px",
+      border: "1px solid rgba(255,255,255,0.14)",
+      background: "linear-gradient(180deg, rgba(14,15,24,0.98), rgba(8,9,15,0.98))",
+      padding: "20px",
+      boxSizing: "border-box",
+      color: "#f6f7fb",
+      boxShadow: "0 30px 80px rgba(0,0,0,0.45)",
     },
-    modalTitle: { fontSize: "14px", fontWeight: 900 },
+    modalTitle: { fontSize: "18px", fontWeight: 900, color: "#ffffff", letterSpacing: "-0.02em" },
     radioRow: { display: "flex", gap: "10px", alignItems: "center", marginTop: "10px", color: "rgba(255,255,255,0.85)" },
     modalActions: { display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "14px" },
     btn: { border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.06)", color: "#fff", padding: "10px 12px", borderRadius: "14px", cursor: "pointer" },
