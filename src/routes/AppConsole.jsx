@@ -1405,7 +1405,6 @@ function scheduleRealtimeIdleFollowup() {
       if (!payload?.blocked) return false;
       setRtcReadyToRespond(false);
       rtcLastFinalTranscriptRef.current = "";
-      queueRealtimeEvent({ event_type: "response.final", role: "assistant", content: payload.reply || "", is_final: true, meta: { source: "server_guard" } });
       commitRealtimeAssistantFinal(payload.reply || "", { source: "server_guard" });
       return true;
     } catch (err) {
@@ -1810,24 +1809,12 @@ function scheduleRealtimeIdleFollowup() {
     rtcLastAssistantFinalRef.current = dedupeKey;
     rtcAssistantFinalCommittedRef.current = true;
 
-    queueRealtimeEvent({ event_type: 'response.final', role: 'assistant', content: finalText, is_final: true, meta: { source } });
-    try {
-      const selectedAgentObj2 = (agents || []).find(a => String(a.id) === String(destSingle || ""));
-      const agentName2 = selectedAgentObj2?.name || "Orkio";
-      const agentId2 = selectedAgentObj2?.id || (destSingle || null);
-      const mid = `rtc_ass_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-      setMessages((prev) => prev.concat([{
-        id: mid,
-        role: "assistant",
-        content: finalText,
-        agent_id: agentId2 ? String(agentId2) : null,
-        agent_name: agentName2,
-        created_at: Math.floor(Date.now()/1000),
-      }]));
-    } catch {}
+    // Realtime transcript must stay out of the visible chat.
+    // It is persisted only in realtime_events and exported later in the ATA/report.
+    queueRealtimeEvent({ event_type: 'response.final', role: 'assistant', content: finalText, is_final: true, meta: { source, visible_in_chat: false } });
 
-    setUploadStatus('📝 ' + finalText.slice(0, 80) + (finalText.length > 80 ? '…' : ''));
-    setTimeout(() => setUploadStatus(''), 2500);
+    setUploadStatus('📝 Resposta registrada na ata da sessão.');
+    setTimeout(() => setUploadStatus(''), 1800);
     setTimeout(() => { try { scheduleRealtimeIdleFollowup(); } catch {} }, REALTIME_REARM_AFTER_ASSISTANT_MS);
   }
 
