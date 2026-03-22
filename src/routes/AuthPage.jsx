@@ -23,6 +23,11 @@ export default function AuthPage() {
   const [resetMode, setResetMode] = useState(false);
   const [resetToken, setResetToken] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+  const [showRegisterPasswordConfirm, setShowRegisterPasswordConfirm] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [showResetPasswordConfirm, setShowResetPasswordConfirm] = useState(false);
 
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
@@ -31,6 +36,14 @@ export default function AuthPage() {
       setResetMode(true);
       setResetToken(rt);
       setTab("login");
+    }
+    if (p.get("session_expired") === "1") {
+      setStatus("Sua sessão expirou. Entre novamente para continuar.");
+    } else if (p.get("pending_approval") === "1") {
+      setPendingApproval(true);
+      setStatus("Seu acesso ainda está aguardando aprovação.");
+    } else if (p.get("approved_now") === "1") {
+      setStatus("Seu acesso foi aprovado. Entre para continuar.");
     }
   }, []);
 
@@ -56,8 +69,12 @@ export default function AuthPage() {
         setStatus(data.message || "Enter the verification code sent to your e-mail. If your account is still pending, access will remain awaiting manual approval after verification.");
         return;
       }
-      if (data?.pending_approval) {
+      if (data?.pending_approval || data?.auth_status === "pending_approval") {
         showAwaitingApproval(data.message || "Identity verified. Awaiting manual approval.");
+        return;
+      }
+      if (!data?.access_token || !data?.user) {
+        setStatus(data?.message || "Não foi possível concluir o login.");
         return;
       }
       setSession({ token: data.access_token, user: data.user, tenant });
@@ -78,8 +95,12 @@ export default function AuthPage() {
         org: tenant,
         body: { tenant, email: pendingEmail || email, code: otpCode },
       });
-      if (data?.pending_approval) {
+      if (data?.pending_approval || data?.auth_status === "pending_approval") {
         showAwaitingApproval(data.message || "Identity verified. Awaiting manual approval.");
+        return;
+      }
+      if (!data?.access_token || !data?.user) {
+        setStatus(data?.message || "Não foi possível concluir o login.");
         return;
       }
       setSession({ token: data.access_token, user: data.user, tenant });
@@ -197,6 +218,35 @@ export default function AuthPage() {
     }
   }
 
+  function renderPasswordField({
+    label,
+    value,
+    onChange,
+    visible,
+    onToggle,
+    placeholder = "••••••••",
+    autoComplete = "current-password",
+  }) {
+    return (
+      <>
+        <label style={lbl}>{label}</label>
+        <div style={passwordWrap}>
+          <input
+            style={{ ...inp, paddingRight: 52 }}
+            value={value}
+            onChange={onChange}
+            type={visible ? "text" : "password"}
+            placeholder={placeholder}
+            autoComplete={autoComplete}
+          />
+          <button type="button" style={togglePwdBtn} onClick={onToggle}>
+            {visible ? "Ocultar" : "Mostrar"}
+          </button>
+        </div>
+      </>
+    );
+  }
+
   const cardStyle = {
     maxWidth: 560,
     margin: "24px auto",
@@ -239,17 +289,37 @@ export default function AuthPage() {
       <input style={inp} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@domain.com" />
 
       {(forgotMode || resetMode) ? null : (
-        <>
-          <label style={lbl}>Password</label>
-          <input style={inp} value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="••••••••" />
-        </>
+        tab === "register"
+          ? renderPasswordField({
+              label: "Password",
+              value: password,
+              onChange: (e) => setPassword(e.target.value),
+              visible: showRegisterPassword,
+              onToggle: () => setShowRegisterPassword((v) => !v),
+              autoComplete: "new-password",
+            })
+          : renderPasswordField({
+              label: "Password",
+              value: password,
+              onChange: (e) => setPassword(e.target.value),
+              visible: showLoginPassword,
+              onToggle: () => setShowLoginPassword((v) => !v),
+              autoComplete: "current-password",
+            })
       )}
 
       {(tab === "register" || resetMode) && !otpMode && !forgotMode ? (
-        <>
-          <label style={lbl}>{resetMode ? "Confirm new password" : "Confirm password"}</label>
-          <input style={inp} value={passwordConfirm} onChange={(e) => setPasswordConfirm(e.target.value)} type="password" placeholder="••••••••" />
-        </>
+        renderPasswordField({
+          label: resetMode ? "Confirm new password" : "Confirm password",
+          value: passwordConfirm,
+          onChange: (e) => setPasswordConfirm(e.target.value),
+          visible: resetMode ? showResetPasswordConfirm : showRegisterPasswordConfirm,
+          onToggle: () => {
+            if (resetMode) setShowResetPasswordConfirm((v) => !v);
+            else setShowRegisterPasswordConfirm((v) => !v);
+          },
+          autoComplete: "new-password",
+        })
       ) : null}
 
       {tab === "register" && !otpMode && !forgotMode && !resetMode ? (
@@ -287,8 +357,14 @@ export default function AuthPage() {
         <>
           <label style={lbl}>Reset token</label>
           <input style={inp} value={resetToken} onChange={(e) => setResetToken(e.target.value)} placeholder="Paste the reset token or open the reset link" />
-          <label style={lbl}>New password</label>
-          <input style={inp} value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="••••••••" />
+          {renderPasswordField({
+            label: "New password",
+            value: password,
+            onChange: (e) => setPassword(e.target.value),
+            visible: showResetPassword,
+            onToggle: () => setShowResetPassword((v) => !v),
+            autoComplete: "new-password",
+          })}
           <div style={{ marginTop: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
             <button disabled={busy} style={btnPrimary} onClick={doResetPassword}>Reset password</button>
             <button disabled={busy} style={btnSecondary} onClick={() => { setResetMode(false); setStatus(""); }}>Cancel</button>
@@ -339,3 +415,17 @@ const tabBtn = (active) => ({
   color: active ? "#fff" : "#111",
   cursor: "pointer",
 });
+
+const passwordWrap = { position: "relative" };
+const togglePwdBtn = {
+  position: "absolute",
+  right: 10,
+  top: "50%",
+  transform: "translateY(-50%)",
+  border: "none",
+  background: "transparent",
+  color: "#374151",
+  cursor: "pointer",
+  fontSize: 12,
+  fontWeight: 600,
+};
